@@ -12,7 +12,6 @@
 *Curated by Senior Digital Marketing Analysts | Battle-tested in production environments*
 
 [![⭐ Star this repo](https://img.shields.io/github/stars/Karanpreet03/SnowflakeResources?style=social)](https://github.com/Karanpreet03/SnowflakeResources)
-[![🍴 Fork it](https://img.shields.io/github/forks/Karanpreet03/SnowflakeResources?style=social)](https://github.com/Karanpreet03/SnoflakeResources/fork)
 [![📖 Read the docs](https://img.shields.io/badge/Read-Documentation-blue)](https://docs.snowflake.com)
 
 </div>
