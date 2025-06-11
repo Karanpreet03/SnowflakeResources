@@ -11,8 +11,8 @@
 
 *Curated by Senior Digital Marketing Analysts | Battle-tested in production environments*
 
-[![⭐ Star this repo](https://img.shields.io/github/stars/yourusername/snowflake-guide?style=social)](https://github.com/yourusername/snowflake-guide)
-[![🍴 Fork it](https://img.shields.io/github/forks/yourusername/snowflake-guide?style=social)](https://github.com/yourusername/snowflake-guide/fork)
+[![⭐ Star this repo](https://img.shields.io/github/stars/yourusername/snowflake-guide?style=social)](https://github.com/Karanpreet03/SnowflakeResources)
+[![🍴 Fork it](https://img.shields.io/github/forks/yourusername/snowflake-guide?style=social)](https://github.com/Karanpreet03/SnoflakeResources/fork)
 [![📖 Read the docs](https://img.shields.io/badge/Read-Documentation-blue)](https://docs.snowflake.com)
 
 </div>
@@ -897,9 +897,301 @@ CREATE NETWORK POLICY corporate_network_policy
 -- Apply to account
 ALTER ACCOUNT SET NETWORK_POLICY = corporate_network_policy;
 
--- Apply to specific user
-ALTER USER sensitive_user SET NETWORK_POLICY = corporate_network_policy;
+-- Clone at specific point in time
+CREATE TABLE campaign_data_yesterday CLONE campaign_data 
+    AT (TIMESTAMP => DATEADD('day', -1, CURRENT_TIMESTAMP()));
+
+-- Test changes without affecting production
+UPDATE campaign_data_test SET status = 'PAUSED' WHERE campaign_id = 'CAMP_001';
+-- Original table remains unchanged!
+```
+
+#### 2. **Dynamic SQL for Flexible Queries**
+```sql
+-- Create reusable stored procedure
+CREATE OR REPLACE PROCEDURE generate_campaign_report(
+    date_range STRING,
+    channels ARRAY
+)
+RETURNS STRING
+LANGUAGE SQL
+AS
+$$
+DECLARE
+    query_sql STRING;
+    result_cursor CURSOR FOR query_sql;
+BEGIN
+    -- Build dynamic query
+    query_sql := 'SELECT campaign_id, channel, SUM(cost) as total_cost, SUM(conversions) as total_conversions FROM campaign_data WHERE date_key >= DATEADD(''day'', -' || date_range || ', CURRENT_DATE) AND channel IN (''' || ARRAY_TO_STRING(channels, ''',''') || ''') GROUP BY campaign_id, channel ORDER BY total_cost DESC';
+    
+    -- Execute and return results
+    OPEN result_cursor FOR query_sql;
+    RETURN 'Report generated successfully';
+END;
+$$;
+
+-- Call the procedure
+CALL generate_campaign_report('7', ARRAY_CONSTRUCT('Google', 'Facebook', 'TikTok'));
+```
+
+#### 3. **Advanced Window Functions**
+```sql
+-- Running totals and percentiles
+SELECT 
+    campaign_id,
+    date_key,
+    daily_cost,
+    -- Running total
+    SUM(daily_cost) OVER (
+        PARTITION BY campaign_id 
+        ORDER BY date_key 
+        ROWS UNBOUNDED PRECEDING
+    ) AS running_total,
+    -- Moving average (7-day)
+    AVG(daily_cost) OVER (
+        PARTITION BY campaign_id 
+        ORDER BY date_key 
+        ROWS 6 PRECEDING
+    ) AS moving_avg_7d,
+    -- Percentile ranking
+    PERCENT_RANK() OVER (
+        PARTITION BY DATE_TRUNC('month', date_key)
+        ORDER BY daily_cost
+    ) AS cost_percentile
+FROM campaign_daily_metrics
+ORDER BY campaign_id, date_key;
+```
+
+#### 4. **Smart Data Sampling**
+```sql
+-- Use SAMPLE for large dataset analysis
+SELECT 
+    channel,
+    AVG(cost_per_click) as avg_cpc,
+    COUNT(*) as sample_size
+FROM campaign_data SAMPLE (10 ROWS)  -- Sample 10 rows
+GROUP BY channel;
+
+-- Percentage-based sampling
+SELECT 
+    campaign_type,
+    MEDIAN(conversion_rate) as median_cvr
+FROM campaign_data SAMPLE (1)  -- Sample 1% of data
+WHERE date_key >= DATEADD('month', -1, CURRENT_DATE)
+GROUP BY campaign_type;
+```
+
+### 🔧 Hidden Gems
+
+#### 1. **QUALIFY Clause (Better than HAVING)**
+```sql
+-- ✅ Use QUALIFY instead of subqueries
+SELECT 
+    customer_id,
+    order_date,
+    order_value,
+    ROW_NUMBER() OVER (PARTITION BY customer_id ORDER BY order_date DESC) as rn
+FROM orders
+QUALIFY rn = 1;  -- Get latest order per customer
+
+-- ❌ Old way with subquery
+SELECT * FROM (
+    SELECT 
+        customer_id,
+        order_date,
+        order_value,
+        ROW_NUMBER() OVER (PARTITION BY customer_id ORDER BY order_date DESC) as rn
+    FROM orders
+) WHERE rn = 1;
+```
+
+#### 2. **LATERAL Joins for Complex Parsing**
+```sql
+-- Parse complex JSON structures
+SELECT 
+    campaign_id,
+    f.value:keyword::STRING as keyword,
+    f.value:bid::NUMBER as bid_amount,
+    f.value:quality_score::NUMBER as quality_score
+FROM campaigns,
+LATERAL FLATTEN(input => keywords_json) f
+WHERE f.value:status = 'ACTIVE';
+```
+
+#### 3. **Conditional Aggregation**
+```sql
+-- Multiple metrics in one query
+SELECT 
+    campaign_id,
+    COUNT(*) as total_days,
+    COUNT(CASE WHEN cost > 100 THEN 1 END) as high_spend_days,
+    AVG(CASE WHEN day_of_week = 'Monday' THEN cost END) as monday_avg_cost,
+    SUM(CASE WHEN conversion_rate > 0.05 THEN conversions ELSE 0 END) as high_cvr_conversions
+FROM campaign_daily_metrics
+GROUP BY campaign_id;
 ```
 
 ---
+
+## 📚 Additional Resources
+
+### 📖 Official Documentation
+- [Snowflake Documentation](https://docs.snowflake.com/)
+- [SQL Reference](https://docs.snowflake.com/en/sql-reference)
+- [Best Practices Guide](https://docs.snowflake.com/en/user-guide/performance-best-practices)
+- [Cost Optimization](https://docs.snowflake.com/en/user-guide/cost-understanding)
+
+### 🎓 Learning Platforms
+- **Snowflake University**: Free official training
+- **Coursera**: Snowflake Data Engineering courses
+- **Udemy**: Hands-on Snowflake projects
+- **Pluralsight**: Advanced Snowflake techniques
+
+### 🛠️ Tools & Extensions
+- **SnowSQL**: Official command-line client
+- **DataGrip**: JetBrains IDE with Snowflake support
+- **VS Code**: Snowflake extension available
+- **Tableau**: Native Snowflake connector
+- **Power BI**: Snowflake connector
+- **Looker**: Direct Snowflake integration
+
+### 📊 Sample Datasets
+```sql
+-- Load Snowflake sample data
+USE ROLE ACCOUNTADMIN;
+CREATE DATABASE IF NOT EXISTS SNOWFLAKE_SAMPLE_DATA FROM SHARE SFC_SAMPLES.SAMPLE_DATA;
+
+-- Available sample datasets:
+-- TPCH_SF1 - TPC-H benchmark data
+-- TPCH_SF10 - Larger TPC-H dataset
+-- TPCH_SF100 - Very large TPC-H dataset
+-- TPCDS_SF10TCL - TPC-DS retail dataset
+-- WEATHER - Weather data
+-- CITIBIKE - NYC bike share data
+```
+
+### 🔗 Community Resources
+- [Snowflake Community](https://community.snowflake.com/)
+- [Stack Overflow](https://stackoverflow.com/questions/tagged/snowflake-cloud-data-platform)
+- [Reddit r/snowflake](https://reddit.com/r/snowflake)
+- [Snowflake Blog](https://www.snowflake.com/blog/)
+- [YouTube Channel](https://www.youtube.com/c/SnowflakeInc)
+
+### 📝 Certification Paths
+1. **SnowPro Core** - Foundational certification
+2. **SnowPro Advanced: Architect** - Architecture and design
+3. **SnowPro Advanced: Data Engineer** - Data engineering focus
+4. **SnowPro Advanced: Data Analyst** - Analytics and BI focus
+
+### 💼 Career Resources
+- **Job Boards**: Indeed, LinkedIn, Glassdoor
+- **Salary Ranges**: 
+  - Junior Snowflake Developer: $70k-$90k
+  - Snowflake Data Engineer: $90k-$130k
+  - Senior Snowflake Architect: $130k-$180k+
+- **Skills to Develop**: SQL, Python, dbt, Airflow, cloud platforms
+
+---
+
+## 👥 Contributing
+
+We welcome contributions from the community! Here's how you can help:
+
+### 🤝 How to Contribute
+
+1. **Fork the Repository**
+   ```bash
+   git clone https://github.com/yourusername/snowflake-guide.git
+   cd snowflake-guide
+   ```
+
+2. **Create a Feature Branch**
+   ```bash
+   git checkout -b feature/new-section
+   ```
+
+3. **Make Your Changes**
+   - Add new examples
+   - Fix typos or errors
+   - Update outdated information
+   - Add new use cases
+
+4. **Submit a Pull Request**
+   - Describe your changes
+   - Include examples if applicable
+   - Reference any issues
+
+### 📋 Contribution Guidelines
+
+- **Code Examples**: Test all SQL queries before submitting
+- **Documentation**: Use clear, concise language
+- **Formatting**: Follow existing markdown style
+- **Attribution**: Credit sources and inspirations
+
+### 🐛 Reporting Issues
+
+Found a bug or have suggestions? Please open an issue with:
+- Clear description of the problem
+- Steps to reproduce (if applicable)
+- Expected vs actual behavior
+- Snowflake version and environment details
+
+### 📞 Get Help
+
+- **Discord**: Join our community server
+- **Email**: snowflake-guide@example.com
+- **Office Hours**: Weekly Q&A sessions (see calendar)
+
+---
+
+## 🌟 Acknowledgments
+
+Special thanks to:
+- Snowflake community contributors
+- Data engineering teams who shared real-world examples
+- Beta testers who provided feedback
+- Open source projects that inspired this guide
+
+---
+
+## 📄 License
+
+This guide is released under the MIT License. See [LICENSE](LICENSE) file for details.
+
+---
+
+## 🚀 What's Next?
+
+This guide is continuously updated. Upcoming sections:
+- [ ] Advanced Snowpipe configurations
+- [ ] Machine Learning with Snowpark
+- [ ] Data sharing and marketplace
+- [ ] Multi-cloud deployment strategies
+- [ ] Advanced security configurations
+- [ ] Disaster recovery and backup strategies
+
+---
+
+<div align="center">
+
+### 🎉 **Congratulations!** 
+You've completed the Snowflake Complete Guide!
+
+**Ready to level up your data game?**
+
+[![🚀 Start Free Trial](https://img.shields.io/badge/Start-Free%20Trial-blue?style=for-the-badge)](https://signup.snowflake.com/)
+[![📚 Snowflake University](https://img.shields.io/badge/Snowflake-University-orange?style=for-the-badge)](https://university.snowflake.com/)
+[![💼 Get Certified](https://img.shields.io/badge/Get-Certified-green?style=for-the-badge)](https://www.snowflake.com/certifications/)
+
+---
+
+**⭐ If this guide helped you, please give it a star!**
+
+**🤝 Share with your team and help others learn Snowflake!**
+
+---
+
+*Built with ❄️ by the data community, for the data community*
+
+</div>
 
